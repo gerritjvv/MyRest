@@ -34,7 +34,7 @@ public class HttpRestHandler extends SimpleChannelUpstreamHandler {
 
 		InetSocketAddress inetAddress = (InetSocketAddress) e
 				.getRemoteAddress();
-		String ip = inetAddress.getAddress().getHostAddress();
+//		String ip = inetAddress.getAddress().getHostAddress();
 
 		final int len = mappings.length;
 		HttpResponse response = null;
