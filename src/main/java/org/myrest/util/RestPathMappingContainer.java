@@ -2,6 +2,7 @@ package org.myrest.util;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
 import org.codehaus.janino.CompileException;
@@ -30,7 +31,6 @@ public class RestPathMappingContainer {
 
 	final RestPathSchema schema;
 	final Class<?> mappingClass;
-	final Object callingInstance;
 	final Method callingMethod;
 
 	final ScriptEvaluator eval;
@@ -38,10 +38,16 @@ public class RestPathMappingContainer {
 	final boolean hasHttpRequest;
 	final int varLen;
 
-	public RestPathMappingContainer(String mappingLine)
-			throws ClassNotFoundException, NoSuchMethodException,
-			SecurityException, InstantiationException, IllegalAccessException,
-			CompileException, ParseException, ScanException {
+	final String className;
+
+	final ControllerFactory controllerFactory;
+
+	public RestPathMappingContainer(String mappingLine) throws Exception {
+		this(mappingLine, null);
+	}
+
+	public RestPathMappingContainer(String mappingLine,
+			ControllerFactory controllerFactory) throws Exception {
 		final String[] mapping = splitPattern.split(mappingLine);
 
 		if (mapping.length != 2)
@@ -55,85 +61,94 @@ public class RestPathMappingContainer {
 			throw new RuntimeException(
 					"Mapping line must be <path> <class>.<method>");
 
-		final String className = classMethodStr.substring(0, lastDotIndex);
+		className = classMethodStr.substring(0, lastDotIndex);
+
+		// if the controllerFactory is null we instantiate a
+		// SingletonControllerFactory
+		controllerFactory = (controllerFactory == null) ? new SingletonControllerFactory(
+				Thread.currentThread().getContextClassLoader()
+						.loadClass(className).newInstance())
+				: controllerFactory;
+
+		this.controllerFactory = controllerFactory;
+
 		final String methodName = classMethodStr.substring(lastDotIndex + 1,
 				classMethodStr.length());
 
 		schema = RestPathParser.parseSchema(mapping[0]);
 		varLen = schema.getVars().length;
 
-		Class<?>[] parameterTypes = new Class<?>[varLen];
+		final String callingStr;
 
-		// find class and method
-		mappingClass = Thread.currentThread().getContextClassLoader()
-				.loadClass(className);
+		mappingClass = controllerFactory.newInstance(className).getClass();
+		callingStr = "((" + className
+				+ ")controllerFactory.newInstance(className))";
+
 		Method callingMethod;
 		boolean hasHttpRequest;
-		ScriptEvaluator eval;
 
 		try {
-			StringBuilder script = new StringBuilder(100);
-			script.append("try{");
-			script.append("return ").append(className).append(".")
-					.append(methodName).append("(");
 
-			for (int i = 0; i < varLen; i++) {
-				parameterTypes[i] = String.class;
-
-				if (i != 0)
-					script.append(",");
-
-				script.append("vars[" + i + "].getValue(split)");
-			}
-
-			script.append(");");
-			script.append("}catch(Throwable t){ RuntimeException rte = new RuntimeException(t.toString(), t); rte.setStackTrace(t.getStackTrace()); throw rte;}");
-			callingMethod = mappingClass.getMethod(methodName, parameterTypes);
+			Class<?>[] parameterTypes = new Class<?>[varLen];
+			Arrays.fill(parameterTypes, String.class);
 
 			hasHttpRequest = false;
-
-			eval = new ScriptEvaluator(script.toString(), HttpResponse.class,
-					new String[] { "httprequest", "split", "vars" },
-					new Class<?>[] { HttpRequest.class, String[].class,
-							RestPathVar[].class });
-			eval.setParentClassLoader(Thread.currentThread()
-					.getContextClassLoader());
+			callingMethod = mappingClass.getMethod(methodName, parameterTypes);
 
 		} catch (NoSuchMethodException method) {
 
-			StringBuilder script = new StringBuilder(100);
-			script.append("try{");
-			script.append("return ").append(className).append(".")
-					.append(methodName).append("(");
-			script.append("httprequest");
-			
-			parameterTypes = new Class<?>[varLen + 1];
-
+			Class<?>[] parameterTypes = new Class<?>[varLen + 1];
+			Arrays.fill(parameterTypes, String.class);
 			parameterTypes[0] = HttpRequest.class;
 
-			for (int i = 0; i < varLen; i++) {
-				parameterTypes[i + 1] = String.class;
-				script.append(", vars[" + i + "].getValue(split)");
-			}
-			script.append(");");
-			script.append("}catch(Throwable t){ RuntimeException rte = new RuntimeException(t.toString(), t); rte.setStackTrace(t.getStackTrace()); throw rte;}");
-			
 			callingMethod = mappingClass.getMethod(methodName, parameterTypes);
 			hasHttpRequest = true;
-
-			eval = new ScriptEvaluator(script.toString(), HttpResponse.class,
-					new String[] { "httprequest", "split", "vars" },
-					new Class<?>[] { HttpRequest.class, String[].class,
-							RestPathVar[].class });
-
 		}
+
+		this.eval = createScriptEval(createScript(callingStr, methodName,
+				varLen, hasHttpRequest));
 
 		this.hasHttpRequest = hasHttpRequest;
 		this.callingMethod = callingMethod;
-		this.eval = eval;
 
-		callingInstance = mappingClass.newInstance();
+	}
 
+	private static final String createScript(String callingStr,
+			String methodName, int varLen, boolean addRequest) {
+		StringBuilder script = new StringBuilder(100);
+		script.append("try{");
+		script.append("return ").append(callingStr).append(".")
+				.append(methodName).append("(");
+
+		if (addRequest) {
+			script.append("httprequest");
+			if (varLen > 0)
+				script.append(",");
+		}
+
+		for (int i = 0; i < varLen; i++) {
+			if (i != 0)
+				script.append(",");
+
+			script.append("vars[" + i + "].getValue(split)");
+		}
+
+		script.append(");");
+		script.append("}catch(Throwable t){ RuntimeException rte = new RuntimeException(t.toString(), t); rte.setStackTrace(t.getStackTrace()); throw rte;}");
+
+		return script.toString();
+	}
+
+	private static final ScriptEvaluator createScriptEval(String script)
+			throws CompileException, ParseException, ScanException {
+		ScriptEvaluator eval = new ScriptEvaluator(script, HttpResponse.class,
+				new String[] { "httprequest", "split", "vars", "className",
+						"controllerFactory" }, new Class<?>[] {
+						HttpRequest.class, String[].class, RestPathVar[].class,
+						String.class, ControllerFactory.class });
+		eval.setParentClassLoader(Thread.currentThread()
+				.getContextClassLoader());
+		return eval;
 	}
 
 	public boolean matches(String path) {
@@ -160,8 +175,28 @@ public class RestPathMappingContainer {
 				.split(path.subSequence(1, path.length())) : splitSlashPattern
 				.split(path);
 
-		return (HttpResponse) eval
-				.evaluate(new Object[] { request, split, vars });
+		return (HttpResponse) eval.evaluate(new Object[] { request, split,
+				vars, className, controllerFactory });
+	}
+
+	/**
+	 * 
+	 * Returns the same instance for the controller
+	 * 
+	 */
+	static class SingletonControllerFactory implements ControllerFactory {
+
+		final Object instance;
+
+		public SingletonControllerFactory(Object instance) {
+			super();
+			this.instance = instance;
+		}
+
+		public Object newInstance(String controllerName) {
+			return instance;
+		}
+
 	}
 
 }
