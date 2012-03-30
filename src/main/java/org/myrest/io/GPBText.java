@@ -25,7 +25,6 @@ public class GPBText extends DefaultHttpResponse {
 
 		byte[] bytes = msg.toByteArray();
 		ChannelBuffer buffer = ChannelBuffers.wrappedBuffer(bytes);
-		buffer.writeBytes(bytes);
 		super.setContent(buffer);
 		this.bytes = bytes;
 	}
