@@ -43,6 +43,7 @@ public class HttpRestHandler extends SimpleChannelUpstreamHandler {
 
 		for (int i = 0; i < len; i++) {
 			RestPathMappingContainer container = mappings[i];
+			
 			if (container.matches(path)) {
 				response = container.call(request, path);
 				break;
