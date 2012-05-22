@@ -39,7 +39,7 @@ public class HttpRestHandler extends SimpleChannelUpstreamHandler {
 		final int len = mappings.length;
 		HttpResponse response = null;
 
-		final String path = new URL(request.getUri()).getPath();
+		final String path = request.getUri();
 
 		for (int i = 0; i < len; i++) {
 			RestPathMappingContainer container = mappings[i];
