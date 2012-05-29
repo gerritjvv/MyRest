@@ -26,7 +26,7 @@ public class RestPathSchema {
 	}
 
 	public final boolean matches(String path) {
-		LOG.info("Matcher: " + path + " to: " + match + " : " + match.matcher(path).matches());
+//		LOG.info("Matcher: " + path + " to: " + match + " : " + match.matcher(path).matches());
 		return match.matcher(path).matches();
 	}
 
