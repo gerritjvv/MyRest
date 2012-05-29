@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>org.myrest</groupId>
+  <artifactId>myrest</artifactId>
+  <versioning>
+    <release>0.1.0</release>
+    <versions>
+      <version>0.1.0</version>
+    </versions>
+    <lastUpdated>20120529134516</lastUpdated>
+  </versioning>
+</metadata>
