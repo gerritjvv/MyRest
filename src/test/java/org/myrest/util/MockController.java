@@ -17,4 +17,10 @@ public class MockController{
 		return new PlainText(req.getMethod().getName());
 	}
 	
+	
+	public static final HttpResponse myrestOp3(HttpRequest req, String id1, String id2) throws UnsupportedEncodingException{
+		System.out.println("ID2: " + id2);
+		System.out.println("QueryString: " + req.getUri());
+		return new PlainText(req.getMethod().getName());
+	}
 }

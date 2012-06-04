@@ -5,12 +5,14 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.janino.CompileException;
 import org.codehaus.janino.Parser.ParseException;
 import org.codehaus.janino.Scanner.ScanException;
 import org.codehaus.janino.ScriptEvaluator;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
+import org.jboss.netty.handler.codec.http.QueryStringDecoder;
 
 /**
  * 
@@ -25,9 +27,6 @@ import org.jboss.netty.handler.codec.http.HttpResponse;
  * 
  */
 public class RestPathMappingContainer {
-
-	private static final Pattern splitPattern = Pattern.compile("[ ]+");
-	private static final Pattern splitSlashPattern = Pattern.compile("/");
 
 	final RestPathSchema schema;
 	final Class<?> mappingClass;
@@ -48,7 +47,7 @@ public class RestPathMappingContainer {
 
 	public RestPathMappingContainer(String mappingLine,
 			ControllerFactory controllerFactory) throws Exception {
-		final String[] mapping = splitPattern.split(mappingLine);
+		final String[] mapping = StringUtils.split(mappingLine);
 
 		if (mapping.length != 2)
 			throw new RuntimeException(
@@ -166,14 +165,19 @@ public class RestPathMappingContainer {
 	 * @throws IllegalArgumentException
 	 * @throws InvocationTargetException
 	 */
-	public HttpResponse call(HttpRequest request, String path)
+	public final HttpResponse call(HttpRequest request, String path)
 			throws InvocationTargetException {
 
 		final RestPathVar[] vars = schema.getVars();
 
-		final String[] split = (path.startsWith("/")) ? splitSlashPattern
-				.split(path.subSequence(1, path.length())) : splitSlashPattern
-				.split(path);
+		
+		final int queryIndex = path.indexOf('?');
+		final String parsePath = (queryIndex > -1) ? path.substring(0, queryIndex) : path;
+		
+		
+		final String[] split = (parsePath.startsWith("/")) ? StringUtils
+				.split(parsePath.substring(1, parsePath.length()), '/') : StringUtils
+				.split(parsePath, '/');
 
 		return (HttpResponse) eval.evaluate(new Object[] { request, split,
 				vars, className, controllerFactory });
@@ -184,7 +188,7 @@ public class RestPathMappingContainer {
 	 * Returns the same instance for the controller
 	 * 
 	 */
-	static class SingletonControllerFactory implements ControllerFactory {
+	static final class SingletonControllerFactory implements ControllerFactory {
 
 		final Object instance;
 
