@@ -3,7 +3,6 @@ package org.myrest.util;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.janino.CompileException;
@@ -12,7 +11,6 @@ import org.codehaus.janino.Scanner.ScanException;
 import org.codehaus.janino.ScriptEvaluator;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
-import org.jboss.netty.handler.codec.http.QueryStringDecoder;
 
 /**
  * 
@@ -28,7 +26,7 @@ import org.jboss.netty.handler.codec.http.QueryStringDecoder;
  */
 public class RestPathMappingContainer {
 
-	final RestPathSchema schema;
+	final AutomatonRestPathSchema schema;
 	final Class<?> mappingClass;
 	final Method callingMethod;
 
@@ -74,7 +72,7 @@ public class RestPathMappingContainer {
 		final String methodName = classMethodStr.substring(lastDotIndex + 1,
 				classMethodStr.length());
 
-		schema = RestPathParser.parseSchema(mapping[0]);
+		schema = AutomatonRestPathParser.parseSchema(mapping[0]);
 		varLen = schema.getVars().length;
 
 		final String callingStr;
